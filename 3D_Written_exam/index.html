@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>정쌤의 3D프린터운용기능사 필기 — 전자책</title>
+<style>
+  :root{
+    --ink:#12151a;
+    --shell:#3b424e;
+    --shell-2:#2c323c;
+    --panel:#222730;
+    --panel-2:#1a1e26;
+    --line:#464e5c;
+    --text:#e8ecf3;
+    --muted:#99a3b4;
+    --violet:#8b7bf0;
+    --cyan:#38d0c4;
+    --amber:#f0b429;
+    --radius:10px;
+    --topbar:54px;
+    --page-w:960px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--shell);
+    color:var(--text);
+    font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    -webkit-text-size-adjust:100%;
+    overflow:hidden;
+  }
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
+  button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+
+  /* ---------- top bar ---------- */
+  .bar{
+    position:fixed;top:0;left:0;right:0;height:var(--topbar);z-index:40;
+    display:flex;align-items:center;gap:8px;padding:0 10px;
+    background:var(--panel-2);border-bottom:1px solid var(--line);
+  }
+  .bar .title{
+    font-size:13.5px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;color:var(--muted);flex:0 1 auto;min-width:0;
+  }
+  .bar .title b{color:var(--text);font-weight:700;}
+  .spacer{flex:1 1 auto;}
+  .btn{
+    height:34px;padding:0 11px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel);font-size:13px;display:inline-flex;align-items:center;gap:6px;
+    white-space:nowrap;transition:background .12s,border-color .12s;
+  }
+  .btn:hover{background:var(--shell-2);border-color:#5b6576;}
+  .btn.on{background:var(--violet);border-color:var(--violet);color:#fff;}
+  .btn.icon{width:34px;padding:0;justify-content:center;font-size:15px;}
+
+  .jump{display:flex;align-items:center;gap:0;border:1px solid var(--line);border-radius:8px;background:var(--panel);height:34px;overflow:hidden;}
+  .jump input{
+    width:62px;height:100%;border:none;background:none;color:var(--text);
+    text-align:center;font-size:13.5px;font-variant-numeric:tabular-nums;
+  }
+  .jump input::-webkit-outer-spin-button,.jump input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  .jump .lab{font-size:11.5px;color:var(--muted);padding:0 9px 0 4px;white-space:nowrap;}
+  .jump .arrow{width:30px;height:100%;border-left:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);}
+  .jump .arrow:hover{background:var(--shell-2);color:var(--text);}
+
+  /* ---------- progress ---------- */
+  .prog{position:fixed;top:var(--topbar);left:0;height:2px;background:var(--cyan);z-index:41;width:0;transition:width .15s;}
+
+  /* ---------- sidebar ---------- */
+  .side{
+    position:fixed;top:var(--topbar);bottom:0;left:0;width:312px;z-index:35;
+    background:var(--panel-2);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;transform:translateX(0);transition:transform .22s cubic-bezier(.3,.7,.3,1);
+  }
+  body.side-closed .side{transform:translateX(-100%);}
+  .side .tabs{display:flex;border-bottom:1px solid var(--line);flex:0 0 auto;}
+  .side .tabs button{
+    flex:1;padding:11px 4px;font-size:12.5px;color:var(--muted);border-bottom:2px solid transparent;
+  }
+  .side .tabs button.on{color:var(--text);border-bottom-color:var(--violet);background:var(--panel);}
+  .side .filterwrap{padding:9px 10px;border-bottom:1px solid var(--line);flex:0 0 auto;}
+  .side .filterwrap input{
+    width:100%;height:32px;border-radius:7px;border:1px solid var(--line);background:var(--panel);
+    color:var(--text);padding:0 10px;font-size:13px;
+  }
+  .side .filterwrap input::placeholder{color:#6f7a8c;}
+  .scroller{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;padding:6px 0 40px;}
+  .scroller::-webkit-scrollbar{width:9px;}
+  .scroller::-webkit-scrollbar-thumb{background:#4b5462;border-radius:9px;border:2px solid var(--panel-2);}
+
+  .part{
+    margin:11px 10px 3px;padding:7px 10px;border-radius:7px;
+    background:linear-gradient(90deg,rgba(139,123,240,.22),rgba(139,123,240,0));
+    border-left:3px solid var(--violet);
+    font-size:13px;font-weight:700;letter-spacing:-.01em;
+  }
+  .part .pno{color:var(--violet);margin-right:6px;}
+  .chap{
+    display:flex;width:100%;text-align:left;gap:8px;align-items:baseline;
+    padding:6px 12px 6px 16px;font-size:12.8px;font-weight:600;color:#cfd6e2;
+  }
+  .sec{
+    display:flex;width:100%;text-align:left;gap:8px;align-items:baseline;
+    padding:4.5px 12px 4.5px 30px;font-size:12.2px;color:var(--muted);
+  }
+  .chap:hover,.sec:hover{background:#2a303a;color:#fff;}
+  .chap.here,.sec.here{background:#2f2a4d;color:#fff;}
+  .sec.quiz{color:var(--cyan);}
+  .tocname{flex:1 1 auto;min-width:0;}
+  .tocpg{flex:0 0 auto;font-size:11.5px;color:#7d8798;font-variant-numeric:tabular-nums;}
+
+  .emptynote{padding:24px 18px;color:var(--muted);font-size:12.5px;line-height:1.7;text-align:center;}
+  .bmrow{display:flex;align-items:center;gap:6px;padding:0 8px 0 12px;}
+  .bmrow:hover{background:#2a303a;}
+  .bmrow .go{flex:1;text-align:left;padding:9px 0;font-size:12.6px;}
+  .bmrow .go small{color:var(--muted);display:block;font-size:11px;margin-top:1px;}
+  .bmrow .del{padding:6px;color:#7d8798;font-size:13px;}
+  .bmrow .del:hover{color:#ff8080;}
+
+  /* ---------- reader ---------- */
+  .reader{
+    position:fixed;top:var(--topbar);left:312px;right:0;bottom:0;overflow-y:auto;
+    scroll-behavior:auto;padding:22px 0 70px;transition:left .22s cubic-bezier(.3,.7,.3,1);
+    background:var(--shell);
+  }
+  body.side-closed .reader{left:0;}
+  .reader::-webkit-scrollbar{width:12px;}
+  .reader::-webkit-scrollbar-thumb{background:#59636f;border-radius:12px;border:3px solid var(--shell);}
+
+  .pg{
+    position:relative;width:min(var(--page-w),calc(100% - 28px));margin:0 auto 20px;
+  }
+  .pg .frame{
+    position:relative;background:#fff;border-radius:3px;
+    box-shadow:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.28);
+    aspect-ratio:1150/1633;overflow:hidden;
+  }
+  .pg img{display:block;width:100%;height:auto;}
+  .pg .ph{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#b9c0cb;font-size:12px;background:#f2f3f5;
+  }
+  .pg .tag{
+    display:flex;align-items:baseline;justify-content:flex-end;gap:9px;
+    margin:6px 2px 0;font-size:11px;color:#9aa4b3;
+    font-variant-numeric:tabular-nums;white-space:nowrap;
+  }
+  .pg .tag .bk{color:#dbe1ea;font-size:12.5px;font-weight:700;}
+  .pg .bmark{
+    position:absolute;top:-2px;right:14px;width:22px;height:30px;
+    background:var(--amber);clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);
+    opacity:0;transform:translateY(-4px);transition:opacity .15s,transform .15s;
+  }
+  .pg.marked .bmark{opacity:1;transform:translateY(0);}
+  .pg .caption{
+    position:absolute;left:0;top:100%;margin-top:5px;font-size:11px;color:#9aa4b3;
+  }
+
+  /* reading modes */
+  body.mode-sepia .pg img{filter:sepia(.32) saturate(.85) brightness(.98);}
+  body.mode-night{--shell:#15181d;}
+  body.mode-night .pg img{filter:invert(1) hue-rotate(180deg) contrast(.92) brightness(.92);}
+  body.mode-night .pg .frame{background:#0d0f12;box-shadow:0 0 0 1px #2a2f38;}
+
+  /* floating page pill */
+  .pill{
+    position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:30;
+    background:rgba(20,23,29,.92);border:1px solid var(--line);border-radius:999px;
+    padding:7px 16px;font-size:12.5px;color:var(--text);font-variant-numeric:tabular-nums;
+    backdrop-filter:blur(8px);pointer-events:none;opacity:0;transition:opacity .2s;
+    white-space:nowrap;
+  }
+  .pill.show{opacity:1;}
+  body.side-closed .pill{left:50%;}
+
+  /* help overlay */
+  .veil{
+    position:fixed;inset:0;z-index:60;background:rgba(10,12,16,.68);
+    display:none;align-items:center;justify-content:center;padding:18px;
+  }
+  .veil.show{display:flex;}
+  .sheet{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    max-width:460px;width:100%;padding:22px 24px 20px;
+  }
+  .sheet h2{margin:0 0 4px;font-size:16px;letter-spacing:-.02em;}
+  .sheet p.sub{margin:0 0 16px;font-size:12.5px;color:var(--muted);line-height:1.6;}
+  .sheet dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:9px 14px;align-items:baseline;}
+  .sheet dt{
+    font-size:11.5px;color:var(--text);background:var(--shell-2);border:1px solid var(--line);
+    border-radius:5px;padding:2px 7px;white-space:nowrap;justify-self:start;
+    font-variant-numeric:tabular-nums;
+  }
+  .sheet dd{margin:0;font-size:12.8px;color:var(--muted);}
+  .sheet .close{margin-top:18px;width:100%;height:38px;border-radius:9px;background:var(--violet);color:#fff;font-weight:600;font-size:13.5px;}
+
+  .scrim{display:none;}
+  @media (max-width:860px){
+    :root{--topbar:50px;}
+    .side{width:82%;max-width:320px;box-shadow:0 0 40px rgba(0,0,0,.5);}
+    .reader{left:0;padding:12px 0 64px;}
+    body:not(.side-closed) .scrim{display:block;position:fixed;inset:var(--topbar) 0 0 0;background:rgba(8,10,14,.55);z-index:34;}
+    .pg{width:calc(100% - 16px);}
+    .hide-sm{display:none;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none !important;}
+  }
+</style>
+</head>
+<body class="side-closed-init">
+
+<div class="bar">
+  <button class="btn icon" id="toggleSide" title="목차 열기/닫기 (T)" aria-label="목차">☰</button>
+  <div class="title hide-sm"><b>정쌤의 3D프린터운용기능사 필기</b> · 전 488면</div>
+  <div class="spacer"></div>
+
+  <div class="jump" title="책 쪽번호로 이동">
+    <button class="arrow" id="prevPg" aria-label="이전 쪽">‹</button>
+    <input id="pgInput" type="number" inputmode="numeric" aria-label="쪽번호">
+    <span class="lab" id="pgTotal">/ 494</span>
+    <button class="arrow" id="nextPg" aria-label="다음 쪽">›</button>
+  </div>
+
+  <button class="btn icon" id="bmBtn" title="이 쪽 책갈피 (B)" aria-label="책갈피">☆</button>
+  <button class="btn icon hide-sm" id="widthBtn" title="폭 조절 (W)" aria-label="폭">⇔</button>
+  <button class="btn icon" id="modeBtn" title="읽기 모드 (M)" aria-label="읽기 모드">◐</button>
+  <button class="btn icon" id="helpBtn" title="단축키 (?)" aria-label="도움말">?</button>
+</div>
+<div class="prog" id="prog"></div>
+
+<aside class="side" id="side">
+  <div class="tabs">
+    <button id="tabToc" class="on">목차</button>
+    <button id="tabBm">책갈피 <span id="bmCount"></span></button>
+  </div>
+  <div class="filterwrap" id="filterWrap">
+    <input id="filter" type="search" placeholder="목차에서 찾기 (예: 공차, G코드, 기출)">
+  </div>
+  <div class="scroller" id="tocList"></div>
+  <div class="scroller" id="bmList" style="display:none"></div>
+</aside>
+<div class="scrim" id="scrim"></div>
+
+<main class="reader" id="reader"></main>
+<div class="pill" id="pill"></div>
+
+<div class="veil" id="veil">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="단축키 안내">
+    <h2>빠르게 읽는 법</h2>
+    <p class="sub">왼쪽 목차에서 단원을 고르거나, 위쪽 칸에 <b>책에 인쇄된 쪽번호</b>를 넣으면 바로 이동합니다. 읽던 위치와 책갈피는 자동으로 저장됩니다.</p>
+    <dl>
+      <dt>← →</dt><dd>한 쪽 앞뒤로</dd>
+      <dt>Space</dt><dd>이어서 내려 읽기</dd>
+      <dt>T</dt><dd>목차 열고 닫기</dd>
+      <dt>B</dt><dd>지금 쪽에 책갈피</dd>
+      <dt>M</dt><dd>밝게 → 세피아 → 반전</dd>
+      <dt>W</dt><dd>쪽 넓이 바꾸기</dd>
+      <dt>G</dt><dd>쪽번호 입력칸으로</dd>
+    </dl>
+    <button class="close" id="helpClose">닫기</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   쪽 매핑 : 책에 인쇄된 쪽번호 = PDF 스캔 면번호 + offset
+   (간지·표지 때문에 구간마다 offset이 달라짐 — 실물 대조로 확정)
+   ============================================================ */
+var SEGS = [[17,62,-1],[64,97,0],[99,194,1],[196,231,2],[233,272,3],[274,309,4],[311,446,5],[448,488,6]];
+var TOTAL = 488;
+
+function bookToScan(b){
+  for(var i=0;i<SEGS.length;i++){
+    var p = b - SEGS[i][2];
+    if(p>=SEGS[i][0] && p<=SEGS[i][1]) return p;
+  }
+  return null;
+}
+function scanToBook(p){
+  for(var i=0;i<SEGS.length;i++){
+    if(p>=SEGS[i][0] && p<=SEGS[i][1]) return p + SEGS[i][2];
+  }
+  return null;
+}
+/* 본문이 아닌 앞부분·간지 면의 이름 */
+var FRONT = {1:"스캔 표지",2:"스캔 표지",3:"책 표지",4:"앞붙임",5:"앞붙임",6:"머리말",7:"머리말",
+             8:"시험 안내",9:"시험 안내",10:"출제기준",11:"출제기준",12:"목차",13:"목차",14:"목차",15:"목차"};
+var DIVIDER = {16:"Part 1 간지",63:"Part 2 간지",98:"Part 3 간지",158:"Part 4 간지",195:"Part 5 간지",
+               232:"Part 6 간지",273:"Part 7 간지",310:"Part 8 간지",334:"Part 9 간지",447:"Part 10 간지"};
+
+/* ============================================================
+   목차 (책에 인쇄된 쪽번호 기준)
+   ============================================================ */
+var TOC = [
+ {p:"Part 1", t:"제품 스캐닝", ch:[
+   {t:"Chapter 01 출력 방식의 이해", g:16, s:[["3D프린팅의 개념",16],["3D프린팅의 방식",17],["3D프린팅의 출력 방식별 적용 분야",19],["출제예상문제",24,1]]},
+   {t:"Chapter 02 스캐너 결정", g:27, s:[["3D스캐너의 개념과 원리",27],["적용 가능 스캐닝 방식 종류",32],["최적 스캐닝 방식 및 스캐너 선택",35],["출제예상문제",37,1]]},
+   {t:"Chapter 03 대상물 스캔", g:42, s:[["스캐닝 준비 단계",42],["스캐닝 설정",44],["출제예상문제",46,1]]},
+   {t:"Chapter 04 스캔 데이터 생성 및 보정", g:50, s:[["스캐닝 데이터 생성 및 저장",50],["스캔 데이터 보정",52],["출제예상문제",58,1]]}
+ ]},
+ {p:"Part 2", t:"3D 형상 모델링", ch:[
+   {t:"Chapter 01 3D 형상 모델링", g:64, s:[["3D CAD 프로그램 활용",64],["작업 지시서 작성",68],["출제예상문제",71,1]]},
+   {t:"Chapter 02 3D 형상 데이터 편집", g:74, s:[["3D 형상 데이터 생성",74],["생성된 형상의 편집 변형",82],["통합 형상 생성",84],["출제예상문제",85,1]]},
+   {t:"Chapter 03 출력용 데이터 수정", g:88, s:[["편집된 형상의 수정",88],["데이터 분할 출력",89],["출력용 데이터 저장",92],["출제예상문제",94,1]]}
+ ]},
+ {p:"Part 3", t:"엔지니어링 모델링", ch:[
+   {t:"Chapter 01 도면의 이해", g:100, s:[["기계제도 기초",100],["도면의 해독",102],["치수 공차와 끼워 맞춤 공차",106],["공차 기호",110],["기하 공차 기호 표시",111],["출제예상문제",118,1]]},
+   {t:"Chapter 02 2D 스케치", g:121, s:[["소프트웨어 기능 파악",121],["2D 스케치 명령 구성",124],["스케치요소 구속 조건 부여",127],["출제예상문제",129,1]]},
+   {t:"Chapter 03 3D 엔지니어링 객체 형성", g:133, s:[["형상 입체화",133],["파트 부품명과 속성 부여",136],["출제예상문제",138,1]]},
+   {t:"Chapter 04 객체 조립", g:142, s:[["파트 배치",142],["파트 조립",143],["출제예상문제",145,1]]},
+   {t:"Chapter 05 출력물 설계 수정", g:148, s:[["파트 수정",148],["파트 분할",151],["모델링 데이터 저장",153],["출제예상문제",155,1]]}
+ ]},
+ {p:"Part 4", t:"3D프린터 SW 설정", ch:[
+   {t:"Chapter 01 출력 보조물(지지대) 설정하기", g:160, s:[["출력 보조물의 필요성 판별",160],["출력 보조물의 종류",162],["출력 보조물의 제거(후가공)",163],["슬라이서 프로그램 운용",164],["출제예상문제",166,1]]},
+   {t:"Chapter 02 슬라이싱", g:169, s:[["제품의 형상 분석",169],["최적의 적층 값 설정",172],["슬라이싱",174],["출제예상문제",179,1]]},
+   {t:"Chapter 03 G코드 생성", g:182, s:[["슬라이싱 상태 파악",182],["G코드 생성",185],["출제예상문제",192,1]]}
+ ]},
+ {p:"Part 5", t:"3D프린터 HW 설정", ch:[
+   {t:"Chapter 01 소재 준비", g:198, s:[["3D프린터 사용 소재",198],["3D프린터 소재 장착",204],["소재 정상 출력 확인",206],["출제예상문제",210,1]]},
+   {t:"Chapter 02 데이터 준비", g:213, s:[["데이터 업로드 방법",213],["G코드 파일 업로드",214],["업로드 확인",216],["출제예상문제",217,1]]},
+   {t:"Chapter 03 장비 출력 설정", g:220, s:[["프린터별 출력 방법 확인",220],["프린터 출력을 위한 사전 준비",226],["출력 조건 최종 확인",229],["출제예상문제",231,1]]}
+ ]},
+ {p:"Part 6", t:"출력용 데이터 확정", ch:[
+   {t:"Chapter 01 문제점 파악", g:236, s:[["오류 검출 프로그램 선정",236],["문제점 리스트 작성 및 출력용 파일 형태 저장",241],["출제예상문제",247,1]]},
+   {t:"Chapter 02 데이터 수정", g:254, s:[["자동 수정 기능",254],["수동 수정 기능",257],["수정 데이터 재생성",269],["출제예상문제",270,1]]}
+ ]},
+ {p:"Part 7", t:"제품 출력", ch:[
+   {t:"Chapter 01 출력 과정 확인", g:278, s:[["3D프린터 바닥 고정",278],["출력 보조물(지지대와 받침대) 판독",280],["G코드 판독",283],["출제예상문제",286,1]]},
+   {t:"Chapter 02 출력 오류 대처", g:289, s:[["출력 오류 대처",289],["G코드 수정",299],["출제예상문제",302,1]]},
+   {t:"Chapter 03 출력물 회수", g:305, s:[["출력별 제품 회수",305],["출제예상문제",311,1]]}
+ ]},
+ {p:"Part 8", t:"3D프린터 안전관리", ch:[
+   {t:"Chapter 01 안전수칙 확인", g:316, s:[["작업 안전수칙 준수",316],["안전 보호구 취급",317],["3D프린터 안전 이용 수칙",326]]},
+   {t:"Chapter 02 예방 점검 실시", g:332, s:[["작업 환경 관리",332],["관련 설비 점검",333],["출제예상문제",335,1]]}
+ ]},
+ {p:"Part 9", t:"필기 기출문제", ch:[
+   {t:"기출문제", g:340, s:[["2018년 정기기능사 제1회",340,1],["2019년 정기기능사 제4회",363,1],["2020년 정기기능사 제3회",380,1],["2020년 정기기능사 제4회",399,1],["2021년 정기기능사 제2회",418,1],["2021년 정기기능사 제4회",435,1]]}
+ ]},
+ {p:"Part 10", t:"적중예상 실전모의고사", ch:[
+   {t:"실전모의고사", g:454, s:[["적중예상 실전모의고사 제1회",454,1],["적중예상 실전모의고사 제2회",473,1]]}
+ ]}
+];
+
+/* ============================================================ */
+var $ = function(id){return document.getElementById(id);};
+var reader = $('reader'), tocList = $('tocList'), bmList = $('bmList');
+var pages = [];           // index 0..487  -> {el, scan, book}
+var current = 1;          // current scan page
+var KEY = 'p3d_reader_v1';
+var store = {pos:1, bm:[], mode:0, width:1, side:null};
+
+try{ var raw = localStorage.getItem(KEY); if(raw) store = Object.assign(store, JSON.parse(raw)); }catch(e){}
+var saveTimer;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){
+    try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch(e){}
+  }, 350);
+}
+
+/* ---------- build pages ---------- */
+(function build(){
+  var frag = document.createDocumentFragment();
+  for(var i=1;i<=TOTAL;i++){
+    var book = scanToBook(i);
+    var d = document.createElement('div');
+    d.className='pg'; d.id='pg'+i; d.dataset.scan=i;
+    var label, sub='';
+    if(book!==null){ label = book; }
+    else if(DIVIDER[i]){ label='—'; sub=DIVIDER[i]; }
+    else if(FRONT[i]){ label='—'; sub=FRONT[i]; }
+    else { label='—'; }
+    d.innerHTML =
+      '<div class="frame">'+
+        '<div class="ph">'+(sub||('p.'+(book!==null?book:i)))+'</div>'+
+      '</div>'+
+      '<div class="bmark" aria-hidden="true"></div>'+
+      '<div class="tag"><span class="bk">'+(book!==null?book:'·')+'</span><span>스캔 '+i+'</span>'+
+        (sub?'<span>'+sub+'</span>':'')+'</div>';
+    frag.appendChild(d);
+    pages.push({el:d, scan:i, book:book});
+  }
+  reader.appendChild(frag);
+})();
+
+/* ---------- lazy load ---------- */
+var io = new IntersectionObserver(function(entries){
+  entries.forEach(function(en){
+    if(!en.isIntersecting) return;
+    var el = en.target, n = +el.dataset.scan;
+    if(el.dataset.loaded) return;
+    el.dataset.loaded='1';
+    var img = new Image();
+    img.decoding='async';
+    img.alt = '교재 '+(pages[n-1].book!==null? pages[n-1].book+'쪽' : (DIVIDER[n]||FRONT[n]||('스캔 '+n)));
+    img.src = 'pages/p'+String(n).padStart(3,'0')+'.webp';
+    img.onload = function(){
+      var f = el.querySelector('.frame');
+      f.style.aspectRatio = img.naturalWidth + '/' + img.naturalHeight;
+      f.innerHTML=''; f.appendChild(img);
+    };
+    img.onerror = function(){
+      el.querySelector('.ph').textContent = '이미지를 찾을 수 없습니다 (pages 폴더 확인)';
+    };
+  });
+},{root:reader, rootMargin:'1200px 0px'});
+pages.forEach(function(p){ io.observe(p.el); });
+
+/* ---------- current page tracking ---------- */
+var pill = $('pill'), prog = $('prog'), pgInput = $('pgInput'), pillTimer;
+function showPill(txt){
+  pill.textContent = txt; pill.classList.add('show');
+  clearTimeout(pillTimer); pillTimer = setTimeout(function(){pill.classList.remove('show');},1100);
+}
+var rafPending=false;
+reader.addEventListener('scroll', function(){
+  if(rafPending) return; rafPending=true;
+  requestAnimationFrame(function(){
+    rafPending=false;
+    var top = reader.scrollTop + 90;
+    var lo=0, hi=pages.length-1, found=0;
+    while(lo<=hi){ var mid=(lo+hi)>>1;
+      if(pages[mid].el.offsetTop <= top){ found=mid; lo=mid+1; } else hi=mid-1; }
+    setCurrent(found+1,false);
+    prog.style.width = (reader.scrollTop/(reader.scrollHeight-reader.clientHeight)*100)+'%';
+  });
+},{passive:true});
+
+function setCurrent(scan, scrollTo){
+  if(scan<1) scan=1; if(scan>TOTAL) scan=TOTAL;
+  current = scan;
+  var bk = pages[scan-1].book;
+  if(document.activeElement!==pgInput) pgInput.value = (bk!==null? bk : '');
+  $('bmBtn').textContent = store.bm.indexOf(scan)>=0 ? '★' : '☆';
+  $('bmBtn').classList.toggle('on', store.bm.indexOf(scan)>=0);
+  store.pos = scan; save();
+  highlightToc(bk);
+  if(scrollTo){
+    reader.scrollTo({top: pages[scan-1].el.offsetTop - 14, behavior:'auto'});
+    showPill(bk!==null ? ('책 '+bk+'쪽  ·  스캔 '+scan+'면')
+                       : ((DIVIDER[scan]||FRONT[scan]||'표지')+'  ·  스캔 '+scan+'면'));
+  }
+}
+function goBook(b){
+  var s = bookToScan(b);
+  if(s===null){
+    // 가장 가까운 유효 쪽 찾기
+    for(var d=1; d<=6; d++){
+      if(bookToScan(b-d)!==null){ s=bookToScan(b-d); break; }
+      if(bookToScan(b+d)!==null){ s=bookToScan(b+d); break; }
+    }
+  }
+  if(s!==null) setCurrent(s,true);
+  else showPill('그 쪽번호는 책에 없습니다');
+}
+
+/* ---------- TOC ---------- */
+function buildToc(q){
+  q = (q||'').trim().toLowerCase();
+  tocList.innerHTML='';
+  var frag = document.createDocumentFragment(), shown=0;
+
+  if(!q){
+    var fm = document.createElement('div');
+    fm.className='part'; fm.style.background='linear-gradient(90deg,rgba(56,208,196,.18),transparent)';
+    fm.style.borderLeftColor='var(--cyan)';
+    fm.textContent='앞부분';
+    frag.appendChild(fm);
+    [[3,'책 표지'],[8,'머리말·시험 안내'],[10,'출제기준'],[12,'이 책의 차례']].forEach(function(f){
+      var b=document.createElement('button'); b.className='sec';
+      b.innerHTML='<span class="tocname">'+f[1]+'</span><span class="tocpg">스캔 '+f[0]+'</span>';
+      b.onclick=function(){ setCurrent(f[0],true); closeIfNarrow(); };
+      frag.appendChild(b);
+    });
+  }
+
+  TOC.forEach(function(part){
+    var chBuf=[], any=false;
+    part.ch.forEach(function(ch){
+      var secBuf=[], chMatch = !q || ch.t.toLowerCase().indexOf(q)>=0 || part.t.toLowerCase().indexOf(q)>=0 || part.p.toLowerCase().indexOf(q)>=0;
+      ch.s.forEach(function(s){
+        var m = !q || chMatch || s[0].toLowerCase().indexOf(q)>=0;
+        if(!m) return;
+        var b=document.createElement('button');
+        b.className='sec'+(s[2]?' quiz':''); b.dataset.book=s[1];
+        b.innerHTML='<span class="tocname">'+s[0]+'</span><span class="tocpg">'+s[1]+'</span>';
+        b.onclick=function(){ goBook(s[1]); closeIfNarrow(); };
+        secBuf.push(b);
+      });
+      if(!secBuf.length && !chMatch) return;
+      var cb=document.createElement('button');
+      cb.className='chap'; cb.dataset.book=ch.g;
+      cb.innerHTML='<span class="tocname">'+ch.t+'</span><span class="tocpg">'+ch.g+'</span>';
+      cb.onclick=function(){ goBook(ch.g); closeIfNarrow(); };
+      chBuf.push(cb); secBuf.forEach(function(x){chBuf.push(x);});
+      any=true;
+    });
+    if(!any) return;
+    shown++;
+    var ph=document.createElement('div'); ph.className='part';
+    ph.innerHTML='<span class="pno">'+part.p+'</span>'+part.t;
+    frag.appendChild(ph);
+    chBuf.forEach(function(x){frag.appendChild(x);});
+  });
+
+  if(q && !shown){
+    var e=document.createElement('div'); e.className='emptynote';
+    e.textContent='"'+q+'" 에 맞는 목차 항목이 없습니다.';
+    frag.appendChild(e);
+  }
+  tocList.appendChild(frag);
+}
+function highlightToc(book){
+  if(book===null) return;
+  var best=null;
+  tocList.querySelectorAll('[data-book]').forEach(function(el){
+    el.classList.remove('here');
+    var b=+el.dataset.book;
+    if(b<=book && (!best || b>=+best.dataset.book)) best=el;
+  });
+  if(best){
+    best.classList.add('here');
+    var sc=tocList, r=best.offsetTop, h=sc.clientHeight;
+    if(r < sc.scrollTop + 8 || r > sc.scrollTop + h - 40){
+      sc.scrollTop = r - h*0.4;
+    }
+  }
+}
+buildToc('');
+
+$('filter').addEventListener('input', function(){ buildToc(this.value); });
+
+/* ---------- bookmarks ---------- */
+function renderBm(){
+  bmList.innerHTML='';
+  $('bmCount').textContent = store.bm.length? '('+store.bm.length+')' : '';
+  pages.forEach(function(p){ p.el.classList.toggle('marked', store.bm.indexOf(p.scan)>=0); });
+  if(!store.bm.length){
+    bmList.innerHTML='<div class="emptynote">책갈피가 없습니다.<br>읽다가 <b>B</b> 를 누르거나 위쪽 ☆ 을 눌러<br>다시 볼 쪽을 표시해 두세요.</div>';
+    return;
+  }
+  var sorted = store.bm.slice().sort(function(a,b){return a-b;});
+  sorted.forEach(function(s){
+    var bk = pages[s-1].book;
+    var row=document.createElement('div'); row.className='bmrow';
+    var go=document.createElement('button'); go.className='go';
+    go.innerHTML='<b>'+(bk!==null? bk+'쪽' : (DIVIDER[s]||FRONT[s]||'표지'))+'</b><small>'+whereIs(bk)+'</small>';
+    go.onclick=function(){ setCurrent(s,true); closeIfNarrow(); };
+    var del=document.createElement('button'); del.className='del'; del.title='삭제'; del.textContent='✕';
+    del.onclick=function(){ store.bm = store.bm.filter(function(x){return x!==s;}); save(); renderBm(); setCurrent(current,false); };
+    row.appendChild(go); row.appendChild(del); bmList.appendChild(row);
+  });
+}
+function whereIs(book){
+  if(book===null) return '앞부분';
+  var label='';
+  TOC.forEach(function(part){ part.ch.forEach(function(ch){
+    ch.s.forEach(function(s){ if(s[1]<=book) label = part.p+' · '+s[0]; });
+  });});
+  return label||'—';
+}
+function toggleBm(){
+  var i = store.bm.indexOf(current);
+  if(i>=0){ store.bm.splice(i,1); showPill('책갈피 해제'); }
+  else { store.bm.push(current); showPill('책갈피 추가'); }
+  save(); renderBm(); setCurrent(current,false);
+}
+renderBm();
+
+/* ---------- tabs ---------- */
+$('tabToc').onclick=function(){ this.classList.add('on'); $('tabBm').classList.remove('on');
+  tocList.style.display='block'; bmList.style.display='none'; $('filterWrap').style.display='block'; };
+$('tabBm').onclick=function(){ this.classList.add('on'); $('tabToc').classList.remove('on');
+  tocList.style.display='none'; bmList.style.display='block'; $('filterWrap').style.display='none'; };
+
+/* ---------- sidebar ---------- */
+function isNarrow(){ return window.matchMedia('(max-width:860px)').matches; }
+function closeIfNarrow(){ if(isNarrow()) document.body.classList.add('side-closed'); }
+document.body.classList.remove('side-closed-init');
+if(store.side===null) store.side = !isNarrow();
+if(!store.side) document.body.classList.add('side-closed');
+$('toggleSide').onclick=function(){
+  document.body.classList.toggle('side-closed');
+  store.side = !document.body.classList.contains('side-closed'); save();
+};
+$('scrim').onclick=function(){ document.body.classList.add('side-closed'); };
+
+/* ---------- reading mode / width ---------- */
+var MODES=['','mode-sepia','mode-night'], MODE_NAME=['밝게','세피아','반전(야간)'];
+function applyMode(){
+  document.body.classList.remove('mode-sepia','mode-night');
+  if(MODES[store.mode]) document.body.classList.add(MODES[store.mode]);
+}
+$('modeBtn').onclick=function(){ store.mode=(store.mode+1)%3; applyMode(); save(); showPill('읽기 모드 · '+MODE_NAME[store.mode]); };
+applyMode();
+
+var WIDTHS=['760px','960px','1180px','1500px'], WNAME=['좁게','보통','넓게','아주 넓게'];
+function applyWidth(){ document.documentElement.style.setProperty('--page-w', WIDTHS[store.width]); }
+$('widthBtn').onclick=function(){ store.width=(store.width+1)%4; applyWidth(); save(); showPill('쪽 넓이 · '+WNAME[store.width]); };
+applyWidth();
+
+/* ---------- controls ---------- */
+$('bmBtn').onclick = toggleBm;
+$('prevPg').onclick=function(){ setCurrent(current-1,true); };
+$('nextPg').onclick=function(){ setCurrent(current+1,true); };
+pgInput.addEventListener('keydown', function(e){
+  if(e.key==='Enter'){ var v=parseInt(this.value,10); if(!isNaN(v)) goBook(v); this.blur(); }
+  e.stopPropagation();
+});
+pgInput.addEventListener('focus', function(){ this.select(); });
+
+$('helpBtn').onclick=function(){ $('veil').classList.add('show'); };
+$('helpClose').onclick=function(){ $('veil').classList.remove('show'); };
+$('veil').onclick=function(e){ if(e.target===this) this.classList.remove('show'); };
+
+document.addEventListener('keydown', function(e){
+  if(e.target.tagName==='INPUT' || e.metaKey || e.ctrlKey || e.altKey) return;
+  var k=e.key;
+  if(k==='ArrowRight'||k==='PageDown'){ e.preventDefault(); setCurrent(current+1,true); }
+  else if(k==='ArrowLeft'||k==='PageUp'){ e.preventDefault(); setCurrent(current-1,true); }
+  else if(k==='Home'){ e.preventDefault(); setCurrent(1,true); }
+  else if(k==='End'){ e.preventDefault(); setCurrent(TOTAL,true); }
+  else if(k==='t'||k==='T'||k==='ㅆ'){ $('toggleSide').click(); }
+  else if(k==='b'||k==='B'||k==='ㅠ'){ toggleBm(); }
+  else if(k==='m'||k==='M'||k==='ㅡ'){ $('modeBtn').click(); }
+  else if(k==='w'||k==='W'||k==='ㅈ'){ $('widthBtn').click(); }
+  else if(k==='g'||k==='G'||k==='ㅎ'){ e.preventDefault(); pgInput.focus(); }
+  else if(k==='?'||k==='/'){ e.preventDefault(); $('veil').classList.toggle('show'); }
+  else if(k==='Escape'){ $('veil').classList.remove('show'); }
+});
+
+/* ---------- restore ---------- */
+window.addEventListener('load', function(){
+  setTimeout(function(){
+    setCurrent(store.pos||1,true);
+    if(store.pos>1) showPill('지난번 읽던 곳에서 이어집니다');
+  },60);
+});
+</script>
+</body>
+</html>
