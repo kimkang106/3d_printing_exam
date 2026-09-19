@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>3D프린터운용기능사 필기 — 마인드맵</title>
+<style>
+:root{
+  --bg:#13161c; --grid:#1c212a; --panel:#1b2029; --line:#39414f;
+  --txt:#e9edf4; --dim:#98a2b3;
+  --p1:#e7686b; --p2:#e89a3c; --p3:#d9c23f; --p4:#63c07a;
+  --p5:#43b5c4; --p6:#5b8ff0; --p7:#9b7af0; --p8:#e070b8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
+  font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",-apple-system,BlinkMacSystemFont,sans-serif;
+  -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid #7aa2ff;outline-offset:2px}
+
+#stage{position:fixed;inset:0;cursor:grab;touch-action:none;
+  background-image:radial-gradient(circle at 1px 1px,var(--grid) 1px,transparent 0);
+  background-size:26px 26px}
+#stage.drag{cursor:grabbing}
+#svg{position:absolute;top:0;left:0;overflow:visible}
+
+.lnk{fill:none;stroke-linecap:round}
+.nd{cursor:pointer}
+.nd rect{stroke-width:1.2}
+.nd text{dominant-baseline:middle;paint-order:stroke}
+.nd .cnt{font-size:9.5px;font-weight:700}
+.nd.dimd{opacity:.2}
+.lnk.dimd{opacity:.08}
+.nd.hit rect{stroke:#ffd84d;stroke-width:2.4}
+
+/* toolbar */
+#bar{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;gap:6px;align-items:center;
+  padding:9px 12px;background:linear-gradient(180deg,rgba(19,22,28,.96),rgba(19,22,28,.72) 70%,transparent);
+  flex-wrap:wrap}
+.ttl{font-size:12.5px;font-weight:700;letter-spacing:-.02em;margin-right:4px;white-space:nowrap}
+.ttl span{color:var(--dim);font-weight:500}
+.grp{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:rgba(27,32,41,.9)}
+.grp button{padding:6px 10px;font-size:12px;color:var(--dim);border-right:1px solid var(--line)}
+.grp button:last-child{border-right:none}
+.grp button:hover{background:#252c37;color:var(--txt)}
+.grp button.on{background:#333d4d;color:#fff}
+#q{border:1px solid var(--line);border-radius:8px;background:rgba(27,32,41,.9);color:var(--txt);
+  padding:6px 10px;font-size:12.5px;width:150px}
+#q::placeholder{color:#6d7685}
+.sp{flex:1}
+#hits{font-size:11.5px;color:var(--dim);white-space:nowrap}
+
+/* legend */
+#leg{position:fixed;left:12px;bottom:12px;z-index:20;display:flex;flex-direction:column;gap:3px;
+  background:rgba(27,32,41,.86);border:1px solid var(--line);border-radius:9px;padding:8px 10px;
+  backdrop-filter:blur(6px)}
+#leg .tog{font-size:10px;color:var(--dim);font-weight:700;letter-spacing:.04em;padding:1px 2px;text-align:left}
+#leg div{display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;padding:1px 0}
+#leg div:hover{color:#fff}
+#leg i{width:9px;height:9px;border-radius:2.5px;flex:0 0 auto}
+#leg.min div{display:none}
+#leg .tog{display:block!important}
+
+/* zoom */
+#zoom{position:fixed;right:12px;bottom:12px;z-index:20;display:flex;flex-direction:column;
+  border:1px solid var(--line);border-radius:9px;overflow:hidden;background:rgba(27,32,41,.9)}
+#zoom button{width:34px;height:32px;font-size:15px;border-bottom:1px solid var(--line);color:var(--dim)}
+#zoom button:last-child{border-bottom:none;font-size:11px}
+#zoom button:hover{background:#252c37;color:#fff}
+
+#tip{position:fixed;z-index:30;max-width:290px;background:#222935;border:1px solid var(--line);
+  border-radius:9px;padding:9px 12px;font-size:12.5px;line-height:1.55;display:none;
+  box-shadow:0 8px 28px rgba(0,0,0,.5)}
+#tip.on{display:block}
+#tip b{display:block;font-size:10.5px;color:var(--dim);font-weight:600;margin-bottom:3px}
+
+#help{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:19;
+  font-size:11px;color:#6d7685;white-space:nowrap;pointer-events:none}
+@media (max-width:760px){
+  #bar{padding:7px 9px;gap:5px}
+  .ttl span{display:none}
+  #q{width:110px}
+  #help{display:none}
+  #leg{padding:6px 8px}
+}
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <div class="ttl">마인드맵 <span>· 3D프린터운용기능사 필기</span></div>
+  <div class="grp" id="depth">
+    <button data-d="1">1단</button><button data-d="2" class="on">2단</button>
+    <button data-d="3">3단</button><button data-d="99">전체</button>
+  </div>
+  <input id="q" type="search" placeholder="노드 검색" aria-label="검색">
+  <span id="hits"></span>
+  <div class="sp"></div>
+  <div class="grp"><button id="fit">화면 맞춤</button></div>
+</div>
+
+<div id="stage"><svg id="svg"><g id="root"></g></svg></div>
+
+<div id="leg"><button class="tog" id="legTog">PART ▾</button></div>
+<div id="zoom">
+  <button id="zin" aria-label="확대">+</button>
+  <button id="zout" aria-label="축소">−</button>
+  <button id="zreset">100%</button>
+</div>
+<div id="tip"></div>
+<div id="help">한 번 누르면 접기·펼치기 · 두 번 누르면 가지 전체 · 왼쪽 아래 PART를 누르면 그 파트만 보기</div>
+
+<script id="data" type="application/json">{"t": "3D프린터\n운용기능사 필기", "c": [{"t": "1. 제품 스캐닝", "c": [{"t": "출력방식의 이해", "c": [{"t": "3D프린팅의 개념과 방식", "c": [{"t": "개념 : 적층 제조"}, {"t": "방식", "c": [{"t": "액체기반 SLA (Stereolithography)", "c": [{"t": "방법", "c": [{"t": "광경화성 수지 재료와 왁스 등의 서포트 재료를 동시 분사하며"}, {"t": "UV로 수지를 경화시켜 제품 제작"}, {"t": "DLP(Digital Light Processing) 방식도 포함"}]}, {"t": "특징", "c": [{"t": "표면처리가 뛰어남"}, {"t": "조형 속도가 빠르고, 정밀도가 높음, 미세한 형상 구현 가능"}, {"t": "시제품 제작, 의료, 전자제품에 많이 응용됨"}, {"t": "고무 및 투명 재지릉ㄹ 사용, 유해물질 발생이 적음"}, {"t": "소재가 액체이므로 출력 후 후처리 과정이 필요"}, {"t": "지지대(서포트) 생성시간이 길고 재료와 장비, 유지보수비용이 FDM에 비해 비쌈"}]}]}, {"t": "파우더기반 SLS (Selecitve Laser Sintering)", "c": [{"t": "방법", "c": [{"t": "파우더 형태의 플라스틱 재료나 메탈 원료"}, {"t": "레이저를 주사하여 재료를 가열, 응고"}]}, {"t": "특징", "c": [{"t": "플라스틱, 나무, 메탈, 세라믹 등 재료 선택의 폭이 넓음"}, {"t": "금속 재료 등 다양한 재료를 사용할 수 있음, 강도가 높음"}, {"t": "지지대(서포트)가 필요 없음"}, {"t": "정밀도가 높고 조형 속도가 빨라 조형물, 디자인, 금형 제작에 응용됨"}, {"t": "후표면처리 공정(후가공)이 필요하고 기계의 가격이 다른 방식에 비해 비쌈"}]}]}, {"t": "고체기반 FDM (Fused Deposition Modeling)", "c": [{"t": "방법", "c": [{"t": "고체 필라멘트 형태의 플라스틱 재료"}, {"t": "고온의 노즐에서 가열하여 재료를 압출"}, {"t": "한 층씩 구조물을 제작"}]}, {"t": "특징", "c": [{"t": "가장 많이 보급"}, {"t": "구조와 프로그램이 다른 방식에 비해 단순"}, {"t": "강도와 내구성이 강하나 정밀도에 따라서 출력 속도가 느림"}, {"t": "표면이 거침"}, {"t": "지지대(서포트)가 필요"}, {"t": "열수축 현상으로 변형이 발생할 수 있음"}, {"t": "소재의 제한이 있음"}, {"t": "장점) 작은 제품부터 큰 제품까지 제작할 수 있다"}, {"t": "단점) 정밀도가 떨어진다"}]}, {"t": "소재", "c": [{"t": "ABS 소재(플라스틱 합성 수지)", "c": [{"t": "온도 저항이 높고 유연성과 강도가 높음"}, {"t": "절삭시 편리, 부품 및 시제품 출력에 주로 사용"}]}, {"t": "PLA 소재(식물 추출 원료)", "c": [{"t": "다양한 색상의 선택이 가능"}, {"t": "잘 휘지 않아 일상적 출력물에 적합"}]}]}]}]}]}, {"t": "3D프린팅 적용 분야", "c": [{"t": "FDM (Material Extrusion)", "c": [{"t": "건설"}, {"t": "센서 및 엑추에이터"}, {"t": "전자 부품"}, {"t": "식품 분야"}, {"t": "의료 분야"}]}, {"t": "SLA, DLP 방식 (Vat Photopolymerization)", "c": [{"t": "원리 : 특정 파장의 빛에 노출되면 경화가 일어나는 광경화성 수지(photopolymer) 표면에 빛을 주사하여 굳어지는 현상을 이용"}, {"t": "분류", "c": [{"t": "주사 방식 - 점경화 방식 : 광경화성 수지 표면에 자외선 레이저 빛 주사, 단면 형상을 형성하고 이를 반복하여 적층"}, {"t": "전사 방식 - 면경화 방식", "c": [{"t": "광원에서 나오는 빛을 성형하고자 하는 단면 형상에 해당하는 모양으로 만들고"}, {"t": "이를 한번에 광경화성 수지에 주사"}]}]}]}, {"t": "Powder Bed Fusion (SLS) 방식", "c": [{"t": "적용분야", "c": [{"t": "의수/의족"}, {"t": "항공/우주"}, {"t": "산업 금형 제작"}]}]}, {"t": "Sheet Lamination (SL) 방식", "c": [{"t": "종이나 판재 재료를 이용하여 제작하는 방식"}]}]}]}, {"t": "스캐너 결정", "c": [{"t": "3D스캐닝의 개념과 종류"}, {"t": "적용 가능 스캐닝 방식"}]}, {"t": "대상물 스캔", "c": [{"t": "스캐닝 방법"}, {"t": "스캐너 장비 조작 기술"}]}, {"t": "스캔데이터 보정", "c": [{"t": "스캔데이터 생성"}, {"t": "스캔데이터 보정"}]}]}, {"t": "2. 3D 형상 모델링", "c": [{"t": "[2-1]3D 형상 모델링", "c": [{"t": "[01] 3D CAD 프로그램 활용", "c": [{"t": "(1)뷰포트 viewport : 3D 형상을 모델링 하기 위한 3D 작업 공간", "c": [{"t": "탑 뷰"}, {"t": "프론트 뷰"}, {"t": "라이트 뷰"}, {"t": "퍼스펙티브 뷰 : 원근감이 있는 입체적인 장면"}]}, {"t": "(2)3D 소프트웨어 주요 기능", "c": [{"t": "기본 메뉴 기능"}, {"t": "3D 모델링 기능 : 기본 도형, 2D 라인을 3D 형상으로, 폴리곤 모델링, CSG"}, {"t": "수정 기능"}, {"t": "재질 입히기"}, {"t": "랜더링 기능"}]}, {"t": "(3)3D 모델링 방식의 종류", "c": [{"t": "폴리곤 방식 : 평면 다각형"}, {"t": "넙스 방식 NURBS : 수학적으로 정의된 3D 곡선 이용"}, {"t": "솔리드 방식 : 내부가 꽉 찬 물체?"}]}]}, {"t": "[02] 작업지시서 작성", "c": [{"t": "(1) 작업 지시서 개념(포함 내용)", "c": [{"t": "제작 개요 : 제작 물품명, 제작 방법, 제작 기간, 제작 수량"}, {"t": "디자인 요구 사항 : 모델링 방법, 제작시 주의 사항,"}, {"t": "정보 도출 : 전체 영역과 부분의 영역 등등"}, {"t": "도면 그리기 : 각 뷰포트 별 도면 그리기"}]}, {"t": "(2) 작업 지시서 내용 (책에 예시 자료가 있음)"}]}]}, {"t": "[2-3]3D 형상 데이터 편집", "c": [{"t": "[01] 3D 형상 데이터 생성", "c": [{"t": "(1) 작업 환경 설정 : 단위는 mm"}, {"t": "(2) 3D 형상 생성 과정", "c": [{"t": "1) 2D 라인 그리기 : 기본적인 2D 형상 + 불러들이기"}, {"t": "2) 3D 형상 만들기", "c": [{"t": "2D 라인 이용 방법", "c": [{"t": "돌출 모델링"}, {"t": "스윕 모델링 : 경로를 따라 2D 단면 돌출 시키기"}, {"t": "회전 모델링 : 축을 기준으로 2D 라인 회전"}, {"t": "로프트 모델링 : 1개 이상의 면과 라인, 2개 이상의 면을 사용"}]}, {"t": "2D 라인 없이", "c": [{"t": "기본 도형 모델링", "c": [{"t": "기본 도형 : 박스, Cone(위 아래 반지름이 다른 원기둥), 스피어 Sphere, 실린더 Cylinder (원기둥), 피라미드, 토러스 Torus (도넛 모양)"}]}, {"t": "폴리곤 모델링 : 삼각형을 기본면으로 3D 객체를 모델링"}, {"t": "CSG (Consturctive Solid Geometry) 방식", "c": [{"t": "기본 객체들에 집합 연산을 적용하여 새로운 객체 만들기"}, {"t": "집합 연산 : 합집합, 교집합, 차집합"}]}]}]}]}]}, {"t": "[02]생성 객체(형상)의 편집 변형", "c": [{"t": "(1) 3D 디자인 소프트웨어의 수정 기능"}, {"t": "(2) 데이터 수정 방법"}]}, {"t": "[03]통합 객체(형상) 생성", "c": [{"t": "(1) 부분 형상 제작"}, {"t": "(2) 형상 조립"}]}]}, {"t": "[2-3]출력용 데이터 수정", "c": [{"t": "[01] 편집된 객체(형상)의 수정", "c": [{"t": "(1) 3D프린터에 따른 형상 데이터 변경 : 출력 가능 해상도에 따른 변경"}, {"t": "(2) 슬라이서 프로그램에서 형상 데이터 변경", "c": [{"t": "출력 시 적측 높이 및 벽 두께 설정"}, {"t": "출력물 내부 밀도"}, {"t": "출력 속도"}, {"t": "출력 재료 설정"}]}]}, {"t": "[02] 데이터 분할 출력"}, {"t": "[03] 출력용 데이터 저장", "c": [{"t": "(1) 3D 형상 데이터의 부가 요소 : 서포트 등"}, {"t": "(2) 출력용 디자인 데이터로 저장 : *.stl, *.obj"}, {"t": "(3) 슬라이서 프로그램으로 출력용 데이터 저장"}]}]}]}, {"t": "3. 엔지니어링 모델링", "c": [{"t": "[3-1]도면의 이해", "c": [{"t": "[01] 기계제도 기초", "c": [{"t": "(1) 도면의 크기 : A0 ~ A4"}, {"t": "(2) 도면 작성시 사용 선의 종류", "i": 1, "c": [{"t": "외형선(굵은 실선) : 보이는 부분"}, {"t": "중심선(가는 1점 쇄선) : 도형의 중심"}, {"t": "은선, 숨은선(은선, 파선) : 보이지 않는 부분"}, {"t": "치수선, 치수 보조선(가는 실선) 치수 기입 또는 지시선에 사용"}, {"t": "가상선, 절단선(가는 2점 쇄선) : 참고 부분"}, {"t": "해칭선(가는 실선) : 단면도의 절단면"}]}, {"t": "(3) 투상법 : 3각법 사용"}, {"t": "(4) 치수 보조 기호", "i": 1}, {"t": "(5) 도면의 척도"}, {"t": "(6) 템플릿"}, {"t": "(7) 좌표계의 종류", "c": [{"t": "직교 좌표계"}, {"t": "극 좌표계 : 거리와 각도로 좌표 표현"}, {"t": "원통 좌표계"}, {"t": "구면 좌표계"}]}]}, {"t": "[02] 도면 해독", "c": [{"t": "(1) 정투상도 선택 및 드로잉", "c": [{"t": "3각법", "i": 1}]}, {"t": "(2) 표준 규격"}, {"t": "(3) 모델링 평면도"}, {"t": "(4) 도면 배치", "i": 1}]}, {"t": "[03] 치수 공차와 끼워 맞춤 공차", "c": [{"t": "(1) 치수 공차", "c": [{"t": "최대 허용 한계 치수와 최소 허용 한계 치수"}]}, {"t": "(2) 용어", "i": 1, "c": [{"t": "내측 형체"}, {"t": "외측 형체"}, {"t": "구멍"}, {"t": "축"}, {"t": "치수"}, {"t": "실 치수"}, {"t": "허용 한계 치수"}, {"t": "치수 공차"}, {"t": "기준 치수"}, {"t": "기준선"}, {"t": "치수 허용차"}, {"t": "위 치수 허용차"}, {"t": "아래 치수 허용차"}, {"t": "공차역"}, {"t": "공차역 클래스(공차 등급)"}, {"t": "기본 공차"}]}, {"t": "(3) 끼워 맞춤", "c": [{"t": "1) 끼워 맞춤의 틈새와 죔새"}, {"t": "2) 끼워 맞춤의 종류", "c": [{"t": "구멍 기준식 끼워 맞춤"}, {"t": "축 기준식 끼워 맞춤"}]}, {"t": "3) 끼워 맞춤 상태에 따른 분류", "c": [{"t": "헐거운 끼워 맞춤 : 어떤 경우든 틈새"}, {"t": "중간 끼워 맞춤 : 틈새 또는 죔새"}, {"t": "억지 끼워 맞춤 : 항상 죔새"}]}]}]}, {"t": "[04] 공차 기호", "c": [{"t": "(1) 치수 공차 기입"}, {"t": "(2) 치수의 허용 한계 기입"}]}, {"t": "[05] 기하 공차 기호 표시", "c": [{"t": "(1) 기하 공차의 필요성 : 정밀도를 지시 하는 것, 효율적 생산, 검사 용이 목적"}, {"t": "(2) 기하 공차 기호", "c": [{"t": "1) 기하 공차의 종류와 기호", "i": 1}, {"t": "2) 공차를 기입하는 틀"}, {"t": "3) 기하 공차 도시 방법"}, {"t": "4) 기하 공차의 해석", "c": [{"t": "1. 선의 직진도 공차"}, {"t": "2. 평면도 공차"}, {"t": "3. 진원도 공차"}, {"t": "4. 원통도 공차"}, {"t": "5. 평행도 공차"}, {"t": "6. 직각도 공차"}, {"t": "7. 점의 위치도 공차"}, {"t": "8. 동축도 또는 동심도 공차"}, {"t": "9. 면의 대칭도 공차"}, {"t": "10. 원주 흔들림 공차"}]}]}]}]}, {"t": "[3-2]2D 스케치", "c": [{"t": "[01]소프트웨어 기능 파악", "c": [{"t": "(1)3D 엔지니어링 소프트웨어 선택", "c": [{"t": "많이 쓰는 소프트웨어 : CATiA, UG-NX, Creo, SolidWorks, Inventor, Solid edge, Fusion 360 등"}, {"t": "파라메트릭 모델링"}]}, {"t": "(2)3D 엔지니어링 소프트웨어 기능", "c": [{"t": "1. 파트(Part)", "c": [{"t": "1. 스케치 작성"}, {"t": "2. 솔리드 모델링"}, {"t": "3. 곡면 모델링"}]}, {"t": "2. 조립품 작성"}, {"t": "3. 도면 작성"}]}]}, {"t": "[02] 2D 스케치 명령 구성", "c": [{"t": "(1)스케치 드로잉 도구", "c": [{"t": "선"}, {"t": "원"}, {"t": "호"}, {"t": "사각형"}, {"t": "슬롯 - 장공 모양? → 긴 홀"}, {"t": "점"}, {"t": "폴리곤"}, {"t": "모깎이"}, {"t": "자르기"}, {"t": "연장"}]}, {"t": "(2)스케치 편집 도구"}]}, {"t": "[03] 스케치요소 구속 조건", "c": [{"t": "(1)스케치요소 구속 조건", "c": [{"t": "구속 조건의 종류", "c": [{"t": "형상 구속"}, {"t": "치수 구속"}]}]}, {"t": "(2)구속 조건의 작성법", "c": [{"t": "1. 수평 구속 조건"}, {"t": "2. 동일 선상 구속 조건"}, {"t": "3. 동심 구속 조건"}, {"t": "4. 고정 구속 조건"}, {"t": "5. 동일 구속 조건"}, {"t": "6. 접선 구속 조건"}, {"t": "7. 일치 구속 조건"}, {"t": "8. 구속 조건 보이기"}, {"t": "9. 구속 조건 숨기기"}, {"t": "10. 구속 조건 삭제"}]}]}, {"t": "솔리드 모델링 작업 순서", "c": [{"t": "1. 스케치 생성하기"}, {"t": "2. 대략적인 2D 단면 또는 외곽선 그리기"}, {"t": "3. 스케치 구속 조건 부여하기"}, {"t": "4. 스케치 요소에 치수 부여하기"}, {"t": "5. 베이스 피처 작성하기"}, {"t": "6. 후속 피처 작성하기"}, {"t": "7. 해석 수행 후 설계의도에 따라 모델링 수정하기"}]}]}, {"t": "[3-3]3D 엔지니어링 객체형성", "c": [{"t": "[01]형상 입체화", "c": [{"t": "(1) 3차원 형상화 기능 명령", "c": [{"t": "1. 돌출"}, {"t": "2. 회전"}, {"t": "3. 구멍"}, {"t": "4. 스윕"}, {"t": "5. 쉘 : 3차원 객체의 면 일부분 제거, 남아 있는 면에 일정한 두께 부여, 속을 만드는 기능", "i": 1}, {"t": "6. 모깍기 및 모따기"}]}]}, {"t": "[02]파트 부품명과 속성 부여", "c": [{"t": "(1) 3D프린팅 부품 파일 저장", "c": [{"t": "1) 저장 명령의 종류"}]}, {"t": "(2) 파트 부품명 저장 시 주의 사항", "c": [{"t": "1) *.STL 파일로 다른 이름 저장하기"}]}]}]}, {"t": "[3-4]객체 조립", "c": [{"t": "[01]파트 배치", "c": [{"t": "(1) 조립품 구성의 시작"}, {"t": "(2) 조립을 위한 부품 배치 형식", "c": [{"t": "상향식 방식 : 파트를 모델링 해놓고 조립품 구성"}, {"t": "하향식 방식 : 조립품에서 부품을 조립하면서 모델링"}, {"t": "1. 기준 부품 배치"}, {"t": "2. 기타 부품 배치"}]}]}, {"t": "[02]파트 조립", "c": [{"t": "(1) 제약 조건의 종류"}, {"t": "(2) 제약 조건 적용", "c": [{"t": "1. 일치 제약 조건"}, {"t": "2. 접촉 제약 조건"}, {"t": "3. 오프셋 제약 조건"}, {"t": "4. 각도 제약 조건"}, {"t": "5. 고정 컴포넌트"}]}]}]}, {"t": "[3-5]출력물 설계 수정", "c": [{"t": "[01]파트 수정", "c": [{"t": "(1) 조립 분석"}, {"t": "(2) 간섭 분석"}, {"t": "(3) 부품 수정"}, {"t": "(4) 공차, 크기, 두께 변경", "c": [{"t": "1) 출력 공차 적용", "c": [{"t": "3D 프린터의 경우 모델링된 형상 데이터를 그대로 읽어 들여 출력하기 때문에 가공자가 스스로 출력 공차를 부여할 수 없음"}, {"t": "모델링하는 사람이 직접 3D 프린터의 출력 공차를 이해하고 사용 중인 3D 프린터의 최소, 최대 출력 공차를 분석한 후 그 값에 맞도록 부품을 수정해야 함."}, {"t": "보통 0.05~0.4 공차 발생, 평균 0.2~0.3 출력 공차 부여하는 것이 좋음"}]}, {"t": "2) 출력 공차 적용 대상", "c": [{"t": "부품과 부품이 조립되는 부분"}, {"t": "부품 중에서 하나에만 적용하는 것이 바람직"}]}, {"t": "3) 크기 및 두께 변경", "c": [{"t": "크기 변경 - 3D 프린터의 한계 고려"}, {"t": "두께 변경 - 3D 프린터의 한계 고려"}]}]}]}, {"t": "[02]파트 분할", "c": [{"t": "(1) 파트 분할의 이해", "i": 1}, {"t": "(2) 파트 분할 적용", "c": [{"t": "1) 분할된 파트 저장 및 3D 프린터 슬라이싱"}]}]}, {"t": "[03] 모델링 데이터 저장", "c": [{"t": "(1) 3D프린팅을 위한 모델링 데이터 변환", "c": [{"t": "슬라이싱 프로그램을 통해 G코드를 생성할 수 있음"}, {"t": "3D프린터 슬라이싱 프로그램은 3D엔지니어링 프로그램에서모델링 된 파일을 가져올 수 없으므로 3D엔지니어링 프로그램에서 부품 파일을 슬라이싱 프로그램에서 인식할 수 있는 형식으로 변경하여 저장 해야 한다"}]}, {"t": "(2) 모델링 데이터 변환 저장하기"}]}]}]}, {"t": "4. 3D프린터 SW 설정", "c": [{"t": "[4-1]출력 보조물(지지대) 설정", "c": [{"t": "[01]출력 보조물의 필요성 판별", "c": [{"t": "지지대의 개념", "c": [{"t": "형상 보조물"}, {"t": "바닥 받침대(브림)"}]}]}, {"t": "[02]출력 보조물의 종류", "c": [{"t": "지지대 구조물의 종류", "i": 2}]}, {"t": "[03] 출력 보조물의 제거(후가공)"}, {"t": "[04] 슬라이서 프로그램 운용 - 지지대 설정", "i": 1}]}, {"t": "[4-2]슬라이싱", "c": [{"t": "[01]제품의 형상 분석", "c": [{"t": "(1)형상 설계", "i": 3}, {"t": "(2)형상 분석", "c": [{"t": "형상의 확대, 축소, 회전, 이동을 통해 지지대 사용 없이 성형되기 어려운 부분을 찾는 것"}]}]}, {"t": "[02]최적의 적층값 설정", "c": [{"t": "(1) 적층 값 : 형상물을 출력하는 데 적층하는 수치, 높을 수록 정밀도가 떨어짐"}, {"t": "(2) 적층 값의 범위", "c": [{"t": "1. Surface 출력 두께 : 벽 두께가 0.5보다 얇으면 출력이 원활 x / 기본적인 적층 값의 범위 :0.06 ~ 0.1"}, {"t": "2. 모델면 오픈 및 클로즈", "i": 1}, {"t": "3. 모서리 : 2개 이상의 출력물을 한번에 출력할 때, 구조물 간 간격 필요 - 모델 간 0.1 이상 간격 필요"}, {"t": "4. 모델의 재료 및 스케일 - 고려 필요"}, {"t": "5. 프린터의 출력 범위 - 고려 필요"}, {"t": "6. 구조물의 안정성"}]}]}, {"t": "[03]슬라이싱", "c": [{"t": "(1) 슬라이싱 개념 및 종류", "c": [{"t": "슬라이서 프로그램 : 3D프린터 구동을 위한 지코드 생성 프로그램"}, {"t": "지코드 : 모터의 움직임을 제어하기 위한 좌푯값이 기입되어 있는 코드 (CNC, 레이저 커팅기 등 다양한 장비에서 사용)", "i": 1}, {"t": "대표적 프로그램 : 큐라, 메이커 봇 데스크톱 소프트웨어, 심플리파이 3D 등", "c": [{"t": "CURA : 얼티메이커사, 무료 슬라이서 프로그램"}, {"t": "메이커 봇 데스크톱 소프트웨어 : 싱기버스 홈페이지 연동, 디자인한 3D 모델링 찾기 가능"}, {"t": "Simplify 3D : 유료 프로그램"}]}]}, {"t": "(2) 슬라이서 프로그램 운용", "c": [{"t": "1. 퀄리티 : 출력 품질, 레이어 두께 또는 높이 설정", "c": [{"t": "1. 레이어 하이트"}, {"t": "2. Shell thickness"}, {"t": "3. Enable retraction"}]}, {"t": "2. Fill : 속을 채우기 - 위아래 두께 늘리기, 출력물 속 채우기", "c": [{"t": "1. Bottom / Top thickness"}, {"t": "2. Fill density (%)"}]}, {"t": "3. Speed and Temperature : 속도조절을 위한 속도, 온도 옵션", "c": [{"t": "1. Print speed : 일반 품질은 50, 고품질은 20~30"}]}, {"t": "4. Machine", "c": [{"t": "1. Nozzle size"}]}, {"t": "5. Support", "c": [{"t": "1. Support type", "c": [{"t": "1. none"}, {"t": "2. Touching buildplate"}, {"t": "3. Everywhere"}]}, {"t": "2. Plafform adhesion type 베드 고정 타입 옵션", "c": [{"t": "1. none"}, {"t": "2. Brim 브림 : 첫번째 레이어를 확장시켜 플레이트에 베드면을 깔아줌, 플레이트와 출력물이 잘 붙지 않을 때 사용"}, {"t": "3. Raft 래프트 : 출력물 아래에 베드면 깔아줌, 출력후 떼어낼 수 있게 함"}]}]}]}]}]}, {"t": "[4-3]G코드 생성", "c": [{"t": "[01]슬라이싱 상태 파악", "c": [{"t": "(1) 가상 적층"}, {"t": "(2) 가상 적층 보는 법 : 경로, 서포트, 플랫폼 확인", "i": 1}]}, {"t": "슬라이서 프로그램 운용"}, {"t": "[03]G코드 생성", "c": [{"t": "(1) 지코드의 규칙", "i": 1}, {"t": "(2) 준비기능 지코드", "i": 3}, {"t": "(3) 지코드 명령", "c": [{"t": "1. 좌표 지령의 방법", "c": [{"t": "1. 절대 지령 G90 → 절대 참조"}, {"t": "2. 증분 지령 G91 → 상대 참조"}]}, {"t": "2. 헤드 이송 명령(보간 기능)", "c": [{"t": "1. 급속 이송 G00 : 가공 없이 최대 속도로 헤드 이동"}, {"t": "2. 직선 보간 G01 : 소재를 첨가하면서 직선으로 이동"}]}, {"t": "3. 기타 준비 기능", "c": [{"t": "1. 대기 G01 : P+밀리초 단위로 정지 시간 지령"}, {"t": "2. 원점 복귀 G28"}, {"t": "3. 공작물 좌표계 G92 → 원점 이동?"}]}, {"t": "4. 보조 기능 M코드 (장치별로 다른 경우 많음)", "c": [{"t": "1. 자주 사용 M 코드", "c": [{"t": "1. M190 : 플랫폼 가열"}, {"t": "2. M109 : 헤드에서 소재를 녹이는 열선의 온도를 지정"}, {"t": "3. M73 : 장치의 제작 진행률 표시"}, {"t": "4. M135 : 헤드의 온도조작을 위한 PID 제어의 온도 측정 및 출력 값 설정 시간 간격 지정"}, {"t": "5. M104 : 헤드의 온도 지정"}, {"t": "6. M133 : 특정헤드를 M109로 지정한 온도로 재가열"}, {"t": "7. M126, M127 : 헤드에 부착된 부가 장치 켜고 끄기"}]}]}]}]}]}]}, {"t": "5. 3D프린터 HW 설정", "c": [{"t": "[5-1]소재 준비", "c": [{"t": "[01]3D프린터 사용 소재", "c": [{"t": "(1)FDM 방식 : 열가소성 플라스틱 수지, 얇은 실처럼", "i": 1}, {"t": "(2) FFF 방식 주 사용 소재", "c": [{"t": "PLA 소재 플라스틱", "c": [{"t": "Poly Lactic Acid : 옥수수 전분 이용 친환경 수지, 무독성"}, {"t": "장점", "c": [{"t": "열변형에 의한 수축이 적음 - 정밀한 출력 가능"}, {"t": "경도가 강함, 쉽게 부서지지 않음"}, {"t": "표면에 광택, 히팅 베드 없이 출력 가능"}, {"t": "유해 물질 발생이 적음"}]}, {"t": "단점", "c": [{"t": "서포트 제거가 어려움"}, {"t": "표면이 거침"}]}]}, {"t": "ABS 소재 플라스틱", "c": [{"t": "acrylonitrile butadiene styrene copolymer 석유추출물로 만든 재료"}, {"t": "장점", "c": [{"t": "충격에 강함, 오래 감, 열에도 상대적으로 강함"}, {"t": "일상적으로 사용하는 플라스틱 소재"}, {"t": "PLA에 비해 저렴"}]}, {"t": "단점", "c": [{"t": "출력 시 휨 현상"}, {"t": "가열할 때 냄새 발생 → 환기 필요"}]}]}, {"t": "나일론 소재", "c": [{"t": "강도와 마모도가 높은 특성의 제품 제작"}]}, {"t": "PC 폴리카보네이트", "c": [{"t": "전기절연성, 치수 안정성이 좋음, 내충격성도 뛰어남"}, {"t": "전기 부품 제작에 가장 많이 사용"}, {"t": "연속적인 힘 받는 부품에는 부적절"}, {"t": "유해물질 발생, 환기 필수"}, {"t": "출력 속도에 따라 압출 온도 설정을 다르게 해야 함"}]}, {"t": "PVA(Polyvinyl Alcohol)", "c": [{"t": "폴리아세트산비닐을 가수 분해 하여 얻어지는 무색 가루"}, {"t": "물에는 녹고, 유기 용매에는 녹지 않음 → 서포트에 주로 이용"}, {"t": "노즐이 두 개인 듀얼 방식 사용 → 제작 소재와 서포트 소재를 다르게 출력, 서포트에 PVA 사용"}]}, {"t": "HIPS (High-Impact Polystyrene)", "c": [{"t": "ABS와 PLA의 중간 정도 강도"}, {"t": "신장률이 뛰어남"}, {"t": "고유의 접착성, 히팅베드에 접착이 우수"}, {"t": "리모넨이란 용액에 녹아서, 서포트 용도로 많이 씀"}]}, {"t": "나무 소재", "c": [{"t": "나무(톱밥)와 수지의 혼합물, 나무와 비슷한 냄새와 촉감"}, {"t": "인테리어 분야 주로 사용"}, {"t": "노즐 직경이 0.5 이상에서 권장"}]}, {"t": "TPU(Thermoplastic Polyurethane)", "c": [{"t": "열가소성 폴리우레탄 탄성체 수지"}, {"t": "내마모성 우수한 고무, 플라스틱 특성 가짐 → 탄성과 투과성이 우수하고 마모에 강함"}, {"t": "탄성이 뛰어나 휘어짐이 필요한 부품 제작에 주로 사용"}, {"t": "가격이 비싼 편"}]}, {"t": "기타 소재 : 초콜릿, Bendlay, Soft-PLA, PVC"}]}, {"t": "소재에 따른 노즐 온도", "i": 1}, {"t": "(3) FFF 방식 외 다른 방식", "c": [{"t": "SLA 방식", "i": 2}, {"t": "SLS 방식", "i": 2}]}, {"t": "(4) MJ 방식", "i": 2}]}, {"t": "[02]3D프린터 소재 장착", "i": 1, "c": [{"t": "(1)FDM(FFF) 방식"}, {"t": "(2)SLA 방식"}, {"t": "(3)SLS 방식"}, {"t": "(4)MJ 방식"}]}, {"t": "[03]소재 정상 출력 확인", "c": [{"t": "(1)FDM(FFF) 방식", "c": [{"t": "1. 노즐 수평 설정"}, {"t": "2. 노즐 막힘 현상"}, {"t": "3. 스테핑 모터 압력 부족"}, {"t": "4. 노즐 출력 두께 조정"}]}, {"t": "(2)SLA 방식", "c": [{"t": "1. 빛 조절"}, {"t": "2. 빛 샘 현상"}]}, {"t": "(3)SLS 방식"}]}]}, {"t": "[5-2]데이터 준비", "c": [{"t": "[01]데이터 업로드 방법", "c": [{"t": "(1) 데이터 전송 방식"}, {"t": "(2) 3D 프린터용 파일 변환"}]}, {"t": "[02]G코드 파일 업로드", "i": 3}, {"t": "[03]업로드 확인", "i": 1}]}, {"t": "[5-3]장비출력 선정", "c": [{"t": "[01]프린터별 출력 방법 확인", "c": [{"t": "(1)FDM(FFF) 방식"}, {"t": "(2)SLA 방식"}, {"t": "(3)SLS 방식"}]}, {"t": "[02]3D프린터의 출력을 위한 사전 준비", "c": [{"t": "(1) 사전 준비", "c": [{"t": "1. 온도 조건 확인", "c": [{"t": "1. 노즐 온도", "i": 1}, {"t": "2. 히팅 베드 온도", "i": 1}]}, {"t": "2. 프린터 내 외부의 청결 상태", "c": [{"t": "1. 노즐 청소 필라멘트"}, {"t": "2. 노즐 청소 필라멘트 없이 청소하는 방법 - 올리브 오일 사용?"}, {"t": "3. 프린터 내외부"}]}]}]}, {"t": "[03]출력 조건 최종 확인", "c": [{"t": "(1) 장비 정밀도 확인", "c": [{"t": "1. 수평 길이"}, {"t": "2. 수평 내부 길이"}, {"t": "3. 수직 방면 구멍"}, {"t": "4. 수평 방면 구멍"}]}, {"t": "(2) 출력 온도 확인"}]}]}]}, {"t": "6. 출력용 데이터 확정", "c": [{"t": "[6-1]문제점 파악", "c": [{"t": "[01]오류 검출 프로그램 선정", "c": [{"t": "(1) 오류 검출 프로그램 종류", "c": [{"t": "넷팹 Netfabb"}, {"t": "메쉬믹서 Meshmixer"}, {"t": "메쉬랩 MeshLab"}]}, {"t": "(2) 모델링한 파일과 출력 후 오류", "c": [{"t": "1. 클로즈 메쉬와 오픈 메쉬"}, {"t": "2. 반전 면"}, {"t": "3. 비매니폴드 현상"}, {"t": "4. 메쉬가 떨어져 있는 경우"}]}]}, {"t": "[02]문제점 리스트 작성", "c": [{"t": "(1) 3D프린팅 할 때의 문제점들", "c": [{"t": "1. 크기"}, {"t": "2. 서포트"}, {"t": "3. 공차"}, {"t": "4. 채우기"}]}, {"t": "(2) 문제점 리스트 작성법"}, {"t": "(3) 출력용 파일 저장", "i": 1}, {"t": "(4) 출력용 파일의 종류와 특성", "c": [{"t": "STL", "i": 2}, {"t": "AMF - STL 단점 다소 보완, ISO 규정된, 표준이지만 널리 사용되지 않는"}, {"t": "OBJ - 호환은 잘되지만 많은 용량 필요, 시간 많이 필요"}, {"t": "3MF - 마이크로소프트 주도로 STL 대체 시도"}, {"t": "PLY - OBJ 발전 추진"}]}]}]}, {"t": "[6-2]데이터 수정", "c": [{"t": "[01]자동 수정 기능", "c": [{"t": "(1) 자동 오류 수정 방법", "c": [{"t": "넷팹"}, {"t": "메쉬믹서"}]}]}, {"t": "[02]수동 수정 기능", "c": [{"t": "(1) 수동 오류 수정 방법"}, {"t": "(2) 수동 오류 수정 기능", "c": [{"t": "메쉬믹서"}]}]}]}, {"t": "[6-3]수정 데이터 재생성", "c": [{"t": "3차원 객체 수정"}, {"t": "출력용 파일 저장"}, {"t": "오류 수정"}]}]}, {"t": "7. 제품 출력", "c": [{"t": "[7-1]출력과정 확인", "c": [{"t": "3D프린터 바닥 고정"}, {"t": "출력 보조물 판독"}, {"t": "G코드 판독"}]}, {"t": "[7-2]출력오류 대처", "c": [{"t": "3D프린터 오류 형태 (pp289~299)", "c": [{"t": "1) 처음부터 재료가 압출되지 않음"}, {"t": "2) 출력 도중에 재료가 압출되지 않음"}, {"t": "3) 재료가 플랫폼에 부착되지 않음"}, {"t": "4) 재료의 압출량이 적음"}, {"t": "5) 재료가 과다하게 압출됨"}, {"t": "6) 바닥이 말려 올라감"}, {"t": "7) 출력물 도중에 단면이 밀려서 성형됨"}, {"t": "8) 일부 층이 만들어지지 않음"}, {"t": "9) 갈라짐"}, {"t": "10) 얇은 선이 생김"}, {"t": "11) 윗부분에 구멍이 생김"}]}, {"t": "G코드 수정"}]}, {"t": "[7-3]출력물 회수", "c": [{"t": "[01]출력별 제품 회수 (305~310)", "c": [{"t": "(1) 고체 방식 프린터"}, {"t": "(2) 액체 방식 프린터"}, {"t": "(3) 분말 방식 프린터"}]}, {"t": "출력별 제품 회수 절차 수립"}]}, {"t": "장비 교정", "c": [{"t": "장비 교정"}, {"t": "장비 개선"}]}]}, {"t": "8. 안전관리", "c": [{"t": "[8-1]안전 수칙 확인", "i": 1, "c": [{"t": "[01]작업 안전수칙 준수"}, {"t": "[02]안전보호구 취급"}, {"t": "[03]3D프린팅 안전 이용 수칙 (<3D프린팅 안전 이용 가이드라인> 과학기술정보통신부 2021)", "c": [{"t": "(1) 계절별 실내 적정 온습도 유지"}, {"t": "(2) 친환경 장비 사용"}, {"t": "(3) 친환경 소재 사용"}, {"t": "(4) FFF 소재"}, {"t": "(5) 환기 장치의 설치"}, {"t": "(6) 자연 환기 실천 방법"}, {"t": "(7) 설치공간 효율적 배치"}, {"t": "(8) 후처리 시 위험성, 유해성 안내"}]}, {"t": "응급처치 수행"}, {"t": "장비의 위해 요소"}, {"t": "소재의 위해 요소"}]}, {"t": "[8-2]예방 점검 실시", "c": [{"t": "[01]작업 환경 관리"}, {"t": "[02]관련 설비 점검"}]}]}]}</script>
+<script>
+var DATA = JSON.parse(document.getElementById('data').textContent);
+var COLORS = ['#e7686b','#e89a3c','#d9c23f','#63c07a','#43b5c4','#5b8ff0','#9b7af0','#e070b8'];
+var SVGNS='http://www.w3.org/2000/svg';
+
+/* ---------- prepare nodes ---------- */
+var UID=0;
+function prep(n,depth,side,color){
+  n.id=++UID; n.d=depth; n.side=side; n.col=color;
+  n.open = depth < 2;
+  (n.c||[]).forEach(function(k){prep(k,depth+1,side,color)});
+}
+DATA.id=++UID; DATA.d=0; DATA.side=0; DATA.col='#cfd6e2'; DATA.open=true;
+DATA.c.forEach(function(p,i){
+  var side = (i < 4) ? 1 : -1;            // Part 1~4 오른쪽, 5~8 왼쪽
+  prep(p,1,side,COLORS[i]);
+  p.open=true;
+});
+
+/* ---------- text measuring ---------- */
+var meas=document.createElement('canvas').getContext('2d');
+function fontFor(d){
+  if(d===0) return '700 15px Pretendard, "Apple SD Gothic Neo", sans-serif';
+  if(d===1) return '700 13.5px Pretendard, "Apple SD Gothic Neo", sans-serif';
+  if(d===2) return '600 12.5px Pretendard, "Apple SD Gothic Neo", sans-serif';
+  if(d===3) return '500 12px Pretendard, "Apple SD Gothic Neo", sans-serif';
+  return '400 11.5px Pretendard, "Apple SD Gothic Neo", sans-serif';
+}
+var MAXC=[16,18,22,26,30,32,34];
+function label(n){
+  var lim=MAXC[Math.min(n.d,MAXC.length-1)];
+  var t=n.t.replace(/\n/g,' ');
+  return t.length>lim ? t.slice(0,lim-1)+'…' : t;
+}
+function width(n){
+  meas.font=fontFor(n.d);
+  var w=meas.measureText(label(n)).width + (n.d===0?34:24);
+  if(n.c&&n.c.length) w+=16;
+  return Math.max(w, n.d===0?120:56);
+}
+function height(n){ return n.d===0?46:(n.d===1?30:(n.d<=3?26:21)); }
+
+/* ---------- layout (two-sided tidy tree) ---------- */
+var VGAP=7, HGAP=30;
+function vgap(n){ return n.d>=4?4:VGAP; }
+function visible(n){ return n.open ? (n.c||[]) : []; }
+function measure(n){
+  var kids=visible(n);
+  n.w=width(n); n.h=height(n);
+  if(!kids.length){ n.sub=n.h+vgap(n); return n.sub; }
+  var s=0; kids.forEach(function(k){ s+=measure(k); });
+  n.sub=Math.max(s, n.h+vgap(n));
+  return n.sub;
+}
+var nodes=[], links=[];
+function place(n,x,yTop,side){
+  n.y = yTop + n.sub/2;
+  n.x = x;
+  n.sd = side;
+  nodes.push(n);
+  var kids=visible(n); if(!kids.length) return;
+  var cy=yTop + (n.sub - kids.reduce(function(a,k){return a+k.sub},0))/2;
+  kids.forEach(function(k){
+    var kx = side>0 ? x + n.w/2 + HGAP + k.w/2 : x - n.w/2 - HGAP - k.w/2;
+    place(k,kx,cy,side);
+    links.push({a:n,b:k,side:side,col:k.col,d:k.d});
+    cy+=k.sub;
+  });
+}
+function layout(){
+  nodes=[]; links=[];
+  DATA.w=width(DATA); DATA.h=height(DATA);
+  var R=[],L=[];
+  DATA.c.forEach(function(p){ (p.side>0?R:L).push(p); });
+  [R,L].forEach(function(arr){ arr.forEach(measure); });
+  var rTot=R.reduce(function(a,p){return a+p.sub},0);
+  var lTot=L.reduce(function(a,p){return a+p.sub},0);
+  var span=Math.max(rTot,lTot);
+  DATA.x=0; DATA.y=0; nodes.push(DATA);
+  var y=-rTot/2;
+  R.forEach(function(p){
+    var px = DATA.w/2 + HGAP + p.w/2;
+    place(p,px,y,1); links.push({a:DATA,b:p,side:1,col:p.col,d:1}); y+=p.sub;
+  });
+  y=-lTot/2;
+  L.forEach(function(p){
+    var px = -DATA.w/2 - HGAP - p.w/2;
+    place(p,px,y,-1); links.push({a:DATA,b:p,side:-1,col:p.col,d:1}); y+=p.sub;
+  });
+  return span;
+}
+
+/* ---------- render ---------- */
+var g=document.getElementById('root'), svg=document.getElementById('svg');
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+function render(){
+  layout();
+  var parts=[];
+  links.forEach(function(L){
+    var x1 = L.a.x + (L.side>0 ? L.a.w/2 : -L.a.w/2);
+    var x2 = L.b.x - (L.side>0 ? L.b.w/2 : -L.b.w/2);
+    var mx = (x1+x2)/2;
+    var sw = L.d<=1 ? 2.6 : (L.d===2 ? 1.9 : 1.2);
+    parts.push('<path class="lnk" data-n="'+L.b.id+'" d="M'+x1+','+L.a.y+
+      ' C'+mx+','+L.a.y+' '+mx+','+L.b.y+' '+x2+','+L.b.y+
+      '" stroke="'+L.col+'" stroke-width="'+sw+'" opacity="'+(L.d<=2?0.85:0.5)+'"/>');
+  });
+  nodes.forEach(function(n){
+    var w=n.w,h=n.h,x=n.x-w/2,y=n.y-h/2;
+    var kids=(n.c||[]).length;
+    var fill, stroke, tcol, fs;
+    if(n.d===0){ fill='#2a3140'; stroke='#66718a'; tcol='#fff'; }
+    else if(n.d===1){ fill=n.col; stroke=n.col; tcol='#12151a'; }
+    else if(n.d===2){ fill='rgba(255,255,255,.07)'; stroke=n.col; tcol='#eef2f8'; }
+    else { fill='rgba(255,255,255,.03)'; stroke='rgba(255,255,255,.14)'; tcol='#c3cbd8'; }
+    var r = n.d<=1?9:7;
+    var s='<g class="nd" data-n="'+n.id+'">';
+    s+='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+r+'" fill="'+fill+'" stroke="'+stroke+'"/>';
+    s+='<text x="'+n.x+'" y="'+(n.y+0.5)+'" text-anchor="middle" fill="'+tcol+
+        '" style="font:'+fontFor(n.d)+'">'+esc(label(n))+'</text>';
+    if(kids && n.d>0){
+      var bx = n.sd>0 ? x+w+9 : x-9;
+      s+='<circle cx="'+bx+'" cy="'+n.y+'" r="8" fill="#1b2029" stroke="'+(n.col==='#cfd6e2'?'#66718a':n.col)+'" stroke-width="1.3"/>';
+      s+='<text class="cnt" x="'+bx+'" y="'+(n.y+0.5)+'" text-anchor="middle" fill="'+
+          (n.open?'#8d97a8':(n.col==='#cfd6e2'?'#cfd6e2':n.col))+'">'+(n.open?'−':kids)+'</text>';
+    }
+    if(n.i){
+      var ix = n.sd>0 ? x-7 : x+w+7;
+      s+='<circle cx="'+ix+'" cy="'+(n.y-h/2+7)+'" r="4.5" fill="#f0b429"/>';
+    }
+    s+='</g>';
+    parts.push(s);
+  });
+  g.innerHTML=parts.join('');
+  applyFilter();
+}
+
+/* ---------- pan & zoom ---------- */
+var tx=0,ty=0,sc=1;
+function apply(){ g.setAttribute('transform','translate('+tx+','+ty+') scale('+sc+')'); }
+function fit(list){
+  var src = (list && list.length) ? list : nodes;
+  var xs=[],ys=[];
+  src.forEach(function(n){xs.push(n.x-n.w/2,n.x+n.w/2);ys.push(n.y-n.h/2,n.y+n.h/2)});
+  var minX=Math.min.apply(null,xs),maxX=Math.max.apply(null,xs);
+  var minY=Math.min.apply(null,ys),maxY=Math.max.apply(null,ys);
+  var W=innerWidth-40, H=innerHeight-110;
+  sc=Math.min(W/(maxX-minX+80), H/(maxY-minY+80), 1.6);
+  sc=Math.max(sc,0.3);
+  tx=innerWidth/2 - ((minX+maxX)/2)*sc;
+  ty=(innerHeight/2+22) - ((minY+maxY)/2)*sc;
+  apply();
+}
+var stage=document.getElementById('stage');
+var dragging=false,sx,sy,moved=0;
+stage.addEventListener('pointerdown',function(e){
+  if(e.target.closest('#bar,#zoom,#leg')) return;
+  dragging=true;moved=0;sx=e.clientX-tx;sy=e.clientY-ty;
+  stage.classList.add('drag');stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove',function(e){
+  if(!dragging)return;
+  var nx=e.clientX-sx,ny=e.clientY-sy;
+  moved+=Math.abs(nx-tx)+Math.abs(ny-ty); tx=nx;ty=ny;apply();
+});
+stage.addEventListener('pointerup',function(e){dragging=false;stage.classList.remove('drag')});
+stage.addEventListener('pointercancel',function(){dragging=false;stage.classList.remove('drag')});
+stage.addEventListener('wheel',function(e){
+  e.preventDefault();
+  var k=Math.exp(-e.deltaY*0.0016), ns=Math.min(3,Math.max(0.06,sc*k));
+  tx=e.clientX-(e.clientX-tx)*(ns/sc); ty=e.clientY-(e.clientY-ty)*(ns/sc); sc=ns; apply();
+},{passive:false});
+/* pinch */
+var pts={},pd=0;
+stage.addEventListener('pointerdown',function(e){pts[e.pointerId]=[e.clientX,e.clientY]});
+stage.addEventListener('pointermove',function(e){
+  if(!(e.pointerId in pts))return; pts[e.pointerId]=[e.clientX,e.clientY];
+  var k=Object.keys(pts); if(k.length!==2)return;
+  dragging=false;
+  var a=pts[k[0]],b=pts[k[1]];
+  var d=Math.hypot(a[0]-b[0],a[1]-b[1]), cx=(a[0]+b[0])/2, cy=(a[1]+b[1])/2;
+  if(pd){ var ns=Math.min(3,Math.max(0.06,sc*d/pd));
+    tx=cx-(cx-tx)*(ns/sc); ty=cy-(cy-ty)*(ns/sc); sc=ns; apply(); }
+  pd=d;
+});
+['pointerup','pointercancel'].forEach(function(ev){
+  stage.addEventListener(ev,function(e){delete pts[e.pointerId];pd=0});
+});
+document.getElementById('zin').onclick=function(){zoomBy(1.25)};
+document.getElementById('zout').onclick=function(){zoomBy(0.8)};
+document.getElementById('zreset').onclick=function(){var k=1/sc;zoomBy(k)};
+function zoomBy(k){
+  var ns=Math.min(3,Math.max(0.06,sc*k)), cx=innerWidth/2, cy=innerHeight/2;
+  tx=cx-(cx-tx)*(ns/sc); ty=cy-(cy-ty)*(ns/sc); sc=ns; apply();
+}
+document.getElementById('fit').onclick=function(){fit()};
+
+/* ---------- interaction ---------- */
+var byId={};
+(function idx(n){byId[n.id]=n;(n.c||[]).forEach(idx)})(DATA);
+
+g.addEventListener('click',function(e){
+  if(moved>6) return;
+  var el=e.target.closest('.nd'); if(!el) return;
+  var n=byId[+el.dataset.n]; if(!n) return;
+  if(n.c&&n.c.length){ n.open=!n.open; render(); }
+  else { showTip(e, n); }
+});
+g.addEventListener('dblclick',function(e){
+  var el=e.target.closest('.nd'); if(!el)return;
+  var n=byId[+el.dataset.n]; if(!n)return;
+  if(n.c&&n.c.length){
+    var target=!n.open || (n.c||[]).some(function(k){return k.c&&k.c.length&&!k.open});
+    (function walk(x){ x.open=target; (x.c||[]).forEach(walk); })(n);
+    render();
+  } else showTip(e,n);
+});
+var tip=document.getElementById('tip');
+function showTip(e,n){
+  tip.innerHTML='<b>'+(n.d===0?'중심':'깊이 '+n.d)+(n.i?' · 노트 캡처 '+n.i+'장':'')+'</b>'+esc(n.t);
+  tip.classList.add('on');
+  var x=Math.min(e.clientX+12, innerWidth-300), y=Math.min(e.clientY+12, innerHeight-90);
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+stage.addEventListener('pointerdown',function(e){ if(!e.target.closest('.nd')) tip.classList.remove('on'); });
+
+/* depth buttons */
+function setDepth(d){
+  (function walk(n){ n.open = n.d < d; (n.c||[]).forEach(walk); })(DATA);
+  DATA.open=true; render(); fit();
+}
+document.querySelectorAll('#depth button').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('#depth button').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on'); setDepth(+b.dataset.d);
+  };
+});
+
+/* legend */
+var leg=document.getElementById('leg');
+var narrow = window.matchMedia('(max-width:760px)').matches;
+if(narrow) leg.classList.add('min');
+document.getElementById('legTog').onclick=function(e){
+  e.stopPropagation(); leg.classList.toggle('min');
+  this.textContent = leg.classList.contains('min') ? 'PART ▸' : 'PART ▾';
+};
+document.getElementById('legTog').textContent = narrow ? 'PART ▸' : 'PART ▾';
+DATA.c.forEach(function(p,i){
+  var d=document.createElement('div');
+  d.innerHTML='<i style="background:'+COLORS[i]+'"></i>'+p.t;
+  d.onclick=function(){
+    // 이 파트만 전부 펼치고 나머지는 접기
+    DATA.c.forEach(function(o){
+      (function walk(n,open){ n.open=open; (n.c||[]).forEach(function(k){walk(k,open)}); })(o, o===p);
+      o.open = (o===p);
+    });
+    DATA.open=true;
+    document.querySelectorAll('#depth button').forEach(function(x){x.classList.remove('on')});
+    render(); fit();
+  };
+  leg.appendChild(d);
+});
+function focusNode(n){
+  var t=nodes.filter(function(x){return x.id===n.id})[0]; if(!t)return;
+  tx=innerWidth/2-t.x*sc; ty=innerHeight/2-t.y*sc; apply();
+}
+
+/* search */
+var q=document.getElementById('q'), hits=document.getElementById('hits'), timer;
+q.addEventListener('input',function(){clearTimeout(timer);var v=this.value.trim();timer=setTimeout(function(){search(v)},180)});
+var matched=null;
+function search(v){
+  if(!v){ matched=null; hits.textContent=''; render(); return; }
+  var low=v.toLowerCase(); matched={}; var cnt=0;
+  (function walk(n,path){
+    var p=path.concat([n]);
+    if(n.t.toLowerCase().indexOf(low)>=0){ cnt++; p.forEach(function(a){matched[a.id]=(a===n)?2:1}); 
+      path.forEach(function(a){a.open=true}); }
+    (n.c||[]).forEach(function(k){walk(k,p)});
+  })(DATA,[]);
+  hits.textContent = cnt? cnt+'개' : '없음';
+  render();
+  if(cnt){
+    var hitNodes = nodes.filter(function(n){return matched[n.id]===2});
+    if(hitNodes.length) fit(hitNodes);
+  }
+}
+function applyFilter(){
+  if(!matched) return;
+  g.querySelectorAll('.nd').forEach(function(el){
+    var m=matched[+el.dataset.n];
+    if(!m) el.classList.add('dimd'); else if(m===2) el.classList.add('hit');
+  });
+  g.querySelectorAll('.lnk').forEach(function(el){
+    if(!matched[+el.dataset.n]) el.classList.add('dimd');
+  });
+}
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='/'){e.preventDefault();q.focus()}
+  if(e.key==='0'){fit()}
+  if(e.key==='Escape'){tip.classList.remove('on')}
+  if(e.key>='1'&&e.key<='4'){ document.querySelectorAll('#depth button')[+e.key-1].click(); }
+});
+
+function sizeSvg(){ svg.setAttribute('width',innerWidth); svg.setAttribute('height',innerHeight); }
+addEventListener('resize',function(){sizeSvg()});
+sizeSvg();
+if(narrow){
+  document.querySelectorAll('#depth button').forEach(function(x){x.classList.remove('on')});
+  document.querySelector("#depth button[data-d='1']").classList.add('on');
+  setDepth(1);
+} else { render(); fit(); }
+</script>
+</body>
+</html>
